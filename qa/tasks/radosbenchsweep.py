@@ -74,7 +74,7 @@ def task(ctx, config):
         raise Exception('min_num_osds cannot be less than 1')
     if min_num_osds > max_num_osds:
         raise Exception('min_num_osds cannot be greater than max_num_osd')
-    osds = range(0, (total_osds_in_cluster + 1))
+    osds = range(total_osds_in_cluster + 1)
 
     # replicas
     min_num_replicas = config.get('min_num_replicas', 3)
@@ -96,44 +96,42 @@ def task(ctx, config):
 
     # file
     fname = config.get('file', 'radosbench.csv')
-    f = open('{}/{}'.format(ctx.archive, fname), 'w')
-    f.write(get_csv_header(config) + '\n')
-    # }
+    with open(f'{ctx.archive}/{fname}', 'w') as f:
+        f.write(get_csv_header(config) + '\n')
+        # }
 
-    # set default pools size=1 to avoid 'unhealthy' issues
-    ctx.manager.set_pool_property('data', 'size', 1)
-    ctx.manager.set_pool_property('metadata', 'size', 1)
-    ctx.manager.set_pool_property('rbd', 'size', 1)
+        # set default pools size=1 to avoid 'unhealthy' issues
+        ctx.manager.set_pool_property('data', 'size', 1)
+        ctx.manager.set_pool_property('metadata', 'size', 1)
+        ctx.manager.set_pool_property('rbd', 'size', 1)
 
-    current_osds_out = 0
+        current_osds_out = 0
 
-    # sweep through all parameters
-    for osds_out, size, replica, rep in product(osds, sizes, replicas, reps):
+        # sweep through all parameters
+        for osds_out, size, replica, rep in product(osds, sizes, replicas, reps):
 
-        osds_in = total_osds_in_cluster - osds_out
+            osds_in = total_osds_in_cluster - osds_out
 
-        if osds_in == 0:
-            # we're done
-            break
+            if osds_in == 0:
+                # we're done
+                break
 
-        if current_osds_out != osds_out:
-            # take an osd out
-            ctx.manager.raw_cluster_cmd(
-                'osd', 'reweight', str(osds_out-1), '0.0')
-            wait_until_healthy(ctx, config)
-            current_osds_out = osds_out
+            if current_osds_out != osds_out:
+                # take an osd out
+                ctx.manager.raw_cluster_cmd(
+                    'osd', 'reweight', str(osds_out-1), '0.0')
+                wait_until_healthy(ctx, config)
+                current_osds_out = osds_out
 
-        if osds_in not in range(min_num_osds, (max_num_osds + 1)):
-            # no need to execute with a number of osds that wasn't requested
-            continue
+            if osds_in not in range(min_num_osds, (max_num_osds + 1)):
+                # no need to execute with a number of osds that wasn't requested
+                continue
 
-        if osds_in < replica:
-            # cannot execute with more replicas than available osds
-            continue
+            if osds_in < replica:
+                # cannot execute with more replicas than available osds
+                continue
 
-        run_radosbench(ctx, config, f, osds_in, size, replica, rep)
-
-    f.close()
+            run_radosbench(ctx, config, f, osds_in, size, replica, rep)
 
     yield
 
@@ -147,7 +145,7 @@ def get_csv_header(conf):
     if given_columns and len(given_columns) != 0:
         for column in given_columns:
             if column not in all_columns:
-                raise Exception('Unknown column ' + column)
+                raise Exception(f'Unknown column {column}')
         return ','.join(conf['columns'])
     else:
         conf['columns'] = all_columns
@@ -162,14 +160,14 @@ def run_radosbench(ctx, config, f, num_osds, size, replica, rep):
     wait_until_healthy(ctx, config)
 
     log.info('Executing with parameters: ')
-    log.info('  num_osd =' + str(num_osds))
-    log.info('  size =' + str(size))
-    log.info('  num_replicas =' + str(replica))
-    log.info('  repetition =' + str(rep))
+    log.info(f'  num_osd ={str(num_osds)}')
+    log.info(f'  size ={str(size)}')
+    log.info(f'  num_replicas ={str(replica)}')
+    log.info(f'  repetition ={str(rep)}')
 
+    PREFIX = 'client.'
     for role in config.get('clients', ['client.0']):
         assert isinstance(role, str)
-        PREFIX = 'client.'
         assert role.startswith(PREFIX)
         id_ = role[len(PREFIX):]
         (remote,) = ctx.cluster.only(role).remotes.keys()
@@ -178,36 +176,55 @@ def run_radosbench(ctx, config, f, num_osds, size, replica, rep):
             args=[
                 'adjust-ulimits',
                 'ceph-coverage',
-                '{}/archive/coverage'.format(teuthology.get_testdir(ctx)),
+                f'{teuthology.get_testdir(ctx)}/archive/coverage',
                 'rados',
                 '--no-log-to-stderr',
-                '--name', role,
-                '-b', str(size),
-                '-p', pool,
-                'bench', str(config.get('time', 120)), 'write',
+                '--name',
+                role,
+                '-b',
+                str(size),
+                '-p',
+                pool,
+                'bench',
+                str(config.get('time', 120)),
+                'write',
             ],
             logger=log.getChild('radosbench.{id}'.format(id=id_)),
             stdin=run.PIPE,
             stdout=BytesIO(),
-            wait=False
+            wait=False,
         )
+
 
         # parse output to get summary and format it as CSV
         proc.wait()
         out = proc.stdout.getvalue()
         all_values = {
-            'stdev_throughput': re.sub(r'Stddev Bandwidth: ', '', re.search(
-                r'Stddev Bandwidth:.*', out).group(0)),
-            'stdev_latency': re.sub(r'Stddev Latency: ', '', re.search(
-                r'Stddev Latency:.*', out).group(0)),
-            'avg_throughput': re.sub(r'Bandwidth \(MB/sec\): ', '', re.search(
-                r'Bandwidth \(MB/sec\):.*', out).group(0)),
-            'avg_latency': re.sub(r'Average Latency: ', '', re.search(
-                r'Average Latency:.*', out).group(0)),
+            'stdev_throughput': re.sub(
+                r'Stddev Bandwidth: ',
+                '',
+                re.search(r'Stddev Bandwidth:.*', out)[0],
+            ),
+            'stdev_latency': re.sub(
+                r'Stddev Latency: ',
+                '',
+                re.search(r'Stddev Latency:.*', out)[0],
+            ),
+            'avg_throughput': re.sub(
+                r'Bandwidth \(MB/sec\): ',
+                '',
+                re.search(r'Bandwidth \(MB/sec\):.*', out)[0],
+            ),
+            'avg_latency': re.sub(
+                r'Average Latency: ',
+                '',
+                re.search(r'Average Latency:.*', out)[0],
+            ),
             'rep': str(rep),
             'num_osd': str(num_osds),
-            'num_replica': str(replica)
+            'num_replica': str(replica),
         }
+
         values_to_write = []
         for column in config['columns']:
             values_to_write.extend([all_values[column]])

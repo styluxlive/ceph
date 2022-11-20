@@ -6,7 +6,7 @@ if len(sys.argv) == 2:
     # topic arn as first argument
     topic_arn = sys.argv[1]
 else:
-    print ('Usage: ' + sys.argv[0] + ' <topic arn>')
+    print(f'Usage: {sys.argv[0]} <topic arn>')
     sys.exit(1)
 
 # endpoint and keys from vstart

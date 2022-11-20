@@ -74,10 +74,10 @@ def usage_acc_validate_fields(r, x, x2, what):
             if x2[field] < x[field]:
                 q.append("field %s: %d < %d" % (field, x2[field], x[field]))
         except Exception as ex:
-            r.append( "missing/bad field " + field + " in " + what + " " + str(ex))
+            r.append(f"missing/bad field {field} in {what} {str(ex)}")
             return
-    if len(q) > 0:
-        r.append("incomplete counts in " + what + ": " + ", ".join(q))
+    if q:
+        r.append(f"incomplete counts in {what}: " + ", ".join(q))
 class usage_acc:
     def __init__(self):
         self.results = {'entries': [], 'summary': []}
@@ -229,7 +229,7 @@ class requestlog_queue():
                 bytes_in = int(msg['content-length'])
             log.info('RL: %s %s %s bytes_out=%d bytes_in=%d failed=%r'
                      % (cat, bucket, user, bytes_out, bytes_in, j['e']))
-            if add_entry == None:
+            if add_entry is None:
                 add_entry = self.adder
             add_entry(cat, bucket, user, bytes_out, bytes_in, j['e'])
 

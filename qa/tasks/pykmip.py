@@ -168,10 +168,15 @@ def assign_ports(ctx, config, initial_port):
     return role_endpoints
 
 def copy_policy_json(ctx, cclient, cconfig):
-    run_in_pykmip_dir(ctx, cclient,
-                        ['cp',
-                         get_pykmip_dir(ctx)+'/examples/policy.json',
-                         get_pykmip_dir(ctx)])
+    run_in_pykmip_dir(
+        ctx,
+        cclient,
+        [
+            'cp',
+            f'{get_pykmip_dir(ctx)}/examples/policy.json',
+            get_pykmip_dir(ctx),
+        ],
+    )
 
 _pykmip_configuration = """# configuration for pykmip
 [server]
@@ -199,38 +204,44 @@ ssl_version=PROTOCOL_TLSv1_2
 """
 
 def create_pykmip_conf(ctx, cclient, cconfig):
-    log.info('#0 cclient={} cconfig={}'.format(pprint.pformat(cclient),pprint.pformat(cconfig)))
+    log.info(
+        f'#0 cclient={pprint.pformat(cclient)} cconfig={pprint.pformat(cconfig)}'
+    )
+
     (remote,) = ctx.cluster.only(cclient).remotes.keys()
     pykmip_ipaddr, pykmip_port, pykmip_hostname = ctx.pykmip.endpoints[cclient]
-    log.info('#1 ip,p,h {} {} {}'.format(pykmip_ipaddr, pykmip_port, pykmip_hostname))
+    log.info(f'#1 ip,p,h {pykmip_ipaddr} {pykmip_port} {pykmip_hostname}')
     clientca = cconfig.get('clientca', None)
-    log.info('#2 clientca {}'.format(clientca))
+    log.info(f'#2 clientca {clientca}')
     serverkey = None
     servercert = cconfig.get('servercert', None)
-    log.info('#3 servercert {}'.format(servercert))
+    log.info(f'#3 servercert {servercert}')
     servercert = ctx.ssl_certificates.get(servercert)
-    log.info('#4 servercert {}'.format(servercert))
+    log.info(f'#4 servercert {servercert}')
     clientkey = None
     clientcert = cconfig.get('clientcert', None)
-    log.info('#3 clientcert {}'.format(clientcert))
+    log.info(f'#3 clientcert {clientcert}')
     clientcert = ctx.ssl_certificates.get(clientcert)
-    log.info('#4 clientcert {}'.format(clientcert))
+    log.info(f'#4 clientcert {clientcert}')
     clientca = ctx.ssl_certificates.get(clientca)
-    log.info('#5 clientca {}'.format(clientca))
+    log.info(f'#5 clientca {clientca}')
     if servercert != None:
-      serverkey = servercert.key
-      servercert = servercert.certificate
-      log.info('#6 serverkey {} servercert {}'.format(serverkey, servercert))
+        serverkey = servercert.key
+        servercert = servercert.certificate
+        log.info(f'#6 serverkey {serverkey} servercert {servercert}')
     if clientcert != None:
-      clientkey = clientcert.key
-      clientcert = clientcert.certificate
-      log.info('#6 clientkey {} clientcert {}'.format(clientkey, clientcert))
+        clientkey = clientcert.key
+        clientcert = clientcert.certificate
+        log.info(f'#6 clientkey {clientkey} clientcert {clientcert}')
     if clientca != None:
-      clientca = clientca.certificate
-      log.info('#7 clientca {}'.format(clientca))
-    if servercert == None or clientca == None or serverkey == None:
-      log.info('#8 clientca {} serverkey {} servercert {}'.format(clientca, serverkey, servercert))
-      raise ConfigError('pykmip: Missing/bad servercert or clientca')
+        clientca = clientca.certificate
+        log.info(f'#7 clientca {clientca}')
+    if servercert is None or clientca is None or serverkey is None:
+        log.info(
+            f'#8 clientca {clientca} serverkey {serverkey} servercert {servercert}'
+        )
+
+        raise ConfigError('pykmip: Missing/bad servercert or clientca')
     pykmipdir = get_pykmip_dir(ctx)
     kmip_conf = _pykmip_configuration.format(
         ipaddr=pykmip_ipaddr,
@@ -247,7 +258,7 @@ def create_pykmip_conf(ctx, cclient, cconfig):
                                            prefix='pykmip')
     os.write(fd, kmip_conf.encode())
     os.close(fd)
-    remote.put_file(local_temp_path, pykmipdir+'/pykmip.conf')
+    remote.put_file(local_temp_path, f'{pykmipdir}/pykmip.conf')
     os.remove(local_temp_path)
 
 @contextlib.contextmanager
@@ -296,11 +307,20 @@ def run_pykmip(ctx, config):
         # start the public endpoint
         client_public_with_id = 'pykmip.public' + '.' + client_id
 
-        run_cmd = 'cd ' + pykmipdir + ' && ' + \
-                  '. .pykmipenv/bin/activate && ' + \
-                  'HOME={}'.format(pykmipdir) + ' && ' + \
-                  'exec pykmip-server -f pykmip.conf -l ' + \
-                  pykmipdir + '/pykmip.log & { read; kill %1; }'
+        run_cmd = (
+            (
+                (
+                    (
+                        f'cd {pykmipdir} && . .pykmipenv/bin/activate && '
+                        + f'HOME={pykmipdir}'
+                    )
+                    + ' && '
+                )
+                + 'exec pykmip-server -f pykmip.conf -l '
+            )
+            + pykmipdir
+        ) + '/pykmip.log & { read; kill %1; }'
+
 
         ctx.daemons.add_daemon(
             remote, 'pykmip', client_public_with_id,
@@ -362,12 +382,11 @@ def create_secrets(ctx, config):
     assert isinstance(config, dict)
 
     pykmipdir = get_pykmip_dir(ctx)
-    pykmip_conf_path = pykmipdir + '/pykmip.conf'
+    pykmip_conf_path = f'{pykmipdir}/pykmip.conf'
     my_output = BytesIO()
     for (client,cconf) in config.items():
         (remote,) = ctx.cluster.only(client).remotes.keys()
-        secrets=cconf.get('secrets')
-        if secrets:
+        if secrets := cconf.get('secrets'):
             secrets_json = json.dumps(cconf['secrets'])
             make_keys = make_keys_template \
                 .replace("{replace-with-secrets}",secrets_json) \
@@ -427,9 +446,10 @@ def task(ctx, config):
         client.0:
           force-branch: master
     """
-    assert config is None or isinstance(config, list) \
-        or isinstance(config, dict), \
-        "task pykmip only supports a list or dictionary for configuration"
+    assert config is None or isinstance(
+        config, (list, dict)
+    ), "task pykmip only supports a list or dictionary for configuration"
+
     all_clients = ['client.{id}'.format(id=id_)
                    for id_ in teuthology.all_roles_of_type(ctx.cluster, 'client')]
     if config is None:
@@ -453,7 +473,7 @@ def task(ctx, config):
     ctx.pykmip = argparse.Namespace()
     ctx.pykmip.endpoints = assign_ports(ctx, config, 5696)
     ctx.pykmip.keys = {}
-    
+
     with contextutil.nested(
         lambda: download(ctx=ctx, config=config),
         lambda: setup_venv(ctx=ctx, config=config),

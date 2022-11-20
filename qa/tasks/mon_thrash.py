@@ -19,8 +19,7 @@ def _get_mons(ctx):
     """
     Get monitor names from the context value.
     """
-    mons = [f[len('mon.'):] for f in teuthology.get_mon_names(ctx)]
-    return mons
+    return [f[len('mon.'):] for f in teuthology.get_mon_names(ctx)]
 
 class MonitorThrasher(Thrasher):
     """
@@ -98,7 +97,7 @@ class MonitorThrasher(Thrasher):
         self.name = name
 
         if self.config is None:
-            self.config = dict()
+            self.config = {}
 
         """ Test reproducibility """
         self.random_seed = self.config.get('seed', None)
@@ -122,7 +121,7 @@ class MonitorThrasher(Thrasher):
         self.freeze_mon_duration = float(self.config.get('freeze_mon_duration', 15.0))
 
         assert self.max_killable() > 0, \
-            'Unable to kill at least one monitor with the current config.'
+                'Unable to kill at least one monitor with the current config.'
 
         """ Store thrashing """
         self.store_thrash = self.config.get('store_thrash', False)
@@ -130,9 +129,9 @@ class MonitorThrasher(Thrasher):
             self.config.get('store_thrash_probability', 50))
         if self.store_thrash:
             assert self.store_thrash_probability > 0, \
-                'store_thrash is set, probability must be > 0'
+                    'store_thrash is set, probability must be > 0'
             assert self.maintain_quorum, \
-                'store_thrash = true must imply maintain_quorum = true'
+                    'store_thrash = true must imply maintain_quorum = true'
 
         #MDS failover
         self.mds_failover = self.config.get('check_mds_failover', False)
@@ -160,9 +159,11 @@ class MonitorThrasher(Thrasher):
         If allowed, indicate that we should thrash a certain percentage of
         the time as determined by the store_thrash_probability value.
         """
-        if not self.store_thrash:
-            return False
-        return self.rng.randrange(0, 101) < self.store_thrash_probability
+        return (
+            self.rng.randrange(0, 101) < self.store_thrash_probability
+            if self.store_thrash
+            else False
+        )
 
     def thrash_store(self, mon):
         """
@@ -171,11 +172,12 @@ class MonitorThrasher(Thrasher):
         """
         self.log('thrashing mon.{id} store'.format(id=mon))
         out = self.manager.raw_cluster_cmd(
-            'tell', 'mon.%s' % mon, 'sync_force',
-            '--yes-i-really-mean-it')
+            'tell', f'mon.{mon}', 'sync_force', '--yes-i-really-mean-it'
+        )
+
         j = json.loads(out)
         assert j['ret'] == 0, \
-            'error forcing store sync on mon.{id}:\n{ret}'.format(
+                'error forcing store sync on mon.{id}:\n{ret}'.format(
                 id=mon,ret=out)
 
     def should_freeze_mon(self):
@@ -219,10 +221,7 @@ class MonitorThrasher(Thrasher):
         Return the maximum number of monitors we can kill.
         """
         m = len(_get_mons(self.ctx))
-        if self.maintain_quorum:
-            return max(math.ceil(m/2.0)-1, 0)
-        else:
-            return m
+        return max(math.ceil(m/2.0)-1, 0) if self.maintain_quorum else m
 
     def do_thrash(self):
         """
@@ -247,9 +246,9 @@ class MonitorThrasher(Thrasher):
 
         self.log('start thrashing')
         self.log('seed: {s}, revive delay: {r}, thrash delay: {t} '\
-                   'thrash many: {tm}, maintain quorum: {mq} '\
-                   'store thrash: {st}, probability: {stp} '\
-                   'freeze mon: prob {fp} duration {fd}'.format(
+                       'thrash many: {tm}, maintain quorum: {mq} '\
+                       'store thrash: {st}, probability: {stp} '\
+                       'freeze mon: prob {fp} duration {fd}'.format(
                 s=self.random_seed,r=self.revive_delay,t=self.thrash_delay,
                 tm=self.thrash_many, mq=self.maintain_quorum,
                 st=self.store_thrash,stp=self.store_thrash_probability,
@@ -262,7 +261,7 @@ class MonitorThrasher(Thrasher):
             self.log('making sure all monitors are in the quorum')
             for m in mons:
                 s = self.manager.get_mon_status(m)
-                assert s['state'] == 'leader' or s['state'] == 'peon'
+                assert s['state'] in ['leader', 'peon']
                 assert len(s['quorum']) == len(mons)
 
             kill_up_to = self.rng.randrange(1, self.max_killable()+1)
@@ -301,7 +300,7 @@ class MonitorThrasher(Thrasher):
                     if m in mons_to_kill:
                         continue
                     s = self.manager.get_mon_status(m)
-                    assert s['state'] == 'leader' or s['state'] == 'peon'
+                    assert s['state'] in ['leader', 'peon']
                     assert len(s['quorum']) == len(mons)-len(mons_to_kill)
 
             self.log('waiting for {delay} secs before reviving monitors'.format(
@@ -323,7 +322,7 @@ class MonitorThrasher(Thrasher):
             self.manager.wait_for_mon_quorum_size(len(mons))
             for m in mons:
                 s = self.manager.get_mon_status(m)
-                assert s['state'] == 'leader' or s['state'] == 'peon'
+                assert s['state'] in ['leader', 'peon']
                 assert len(s['quorum']) == len(mons)
 
             if self.scrub:
@@ -342,7 +341,7 @@ class MonitorThrasher(Thrasher):
         if self.mds_failover:
             status = self.mds_cluster.status()
             assert not oldstatus.hadfailover(status), \
-                'MDS Failover'
+                    'MDS Failover'
 
 
 @contextlib.contextmanager

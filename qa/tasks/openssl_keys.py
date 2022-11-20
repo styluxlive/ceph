@@ -69,7 +69,7 @@ class OpenSSLKeys(Task):
         for name, config in configs:
             # names must be unique to avoid clobbering each others files
             if name in self.ctx.ssl_certificates:
-                raise ConfigError('ssl: duplicate certificate name {}'.format(name))
+                raise ConfigError(f'ssl: duplicate certificate name {name}')
 
             # create the key and certificate
             cert = self.create_cert(name, config)
@@ -124,9 +124,7 @@ class OpenSSLKeys(Task):
         # provide the common name in -subj to avoid the openssl command prompts
         subject = f'/CN={cn}'
 
-        # if a ca certificate is provided, use it to sign the new certificate
-        ca = config.get('ca', None)
-        if ca:
+        if ca := config.get('ca', None):
             # the ca certificate must have been created by a prior ssl task
             ca_cert = self.ctx.ssl_certificates.get(ca, None)
             if not ca_cert:
@@ -146,10 +144,11 @@ class OpenSSLKeys(Task):
 
             if san_ext:
                 remove_files.append(ext)
-                ca_cert.remote.write_file(path=ext,
-                    data='subjectAltName = DNS:{},IP:{}'.format(
-                        cn,
-                        config.get('ip', cert.remote.ip_address)))
+                ca_cert.remote.write_file(
+                    path=ext,
+                    data=f"subjectAltName = DNS:{cn},IP:{config.get('ip', cert.remote.ip_address)}",
+                )
+
 
             # create the signed certificate
             ca_cert.remote.run(args=['openssl', 'x509', '-req', '-in', csr,
@@ -202,10 +201,10 @@ class OpenSSLKeys(Task):
         installed.remote = remote
 
         if remote.os.package_type == 'deb':
-            installed.path = '/usr/local/share/ca-certificates/{}.crt'.format(cert.name)
+            installed.path = f'/usr/local/share/ca-certificates/{cert.name}.crt'
             installed.command = ['sudo', 'update-ca-certificates']
         else:
-            installed.path = '/usr/share/pki/ca-trust-source/anchors/{}.crt'.format(cert.name)
+            installed.path = f'/usr/share/pki/ca-trust-source/anchors/{cert.name}.crt'
             installed.command = ['sudo', 'update-ca-trust']
 
         cp_or_mv = 'cp'
@@ -235,7 +234,7 @@ class OpenSSLKeys(Task):
         The remotes don't have public-key auth for 'scp' or misc.copy_file(),
         so this copies through an intermediate local tmp file.
         """
-        log.info('copying from {}:{} to {}:{}...'.format(from_remote, from_path, to_remote, to_path))
+        log.info(f'copying from {from_remote}:{from_path} to {to_remote}:{to_path}...')
         local_path = from_remote.get_file(from_path)
         try:
             to_remote.put_file(local_path, to_path)

@@ -37,12 +37,12 @@ def task(ctx, config):
     (remote,) = ctx.cluster.only(client).remotes.keys()
 
     for poolid in range(num_pools):
-        poolname = "%s-%s" % (pool_prefix, str(poolid))
-        log.info("Creating pool %s" % (poolname,))
+        poolname = f"{pool_prefix}-{str(poolid)}"
+        log.info(f"Creating pool {poolname}")
         ctx.managers['ceph'].create_pool(poolname)
         for imageid in range(num_images):
-            imagename = "rbd-%s" % (str(imageid),)
-            log.info("Creating imagename %s" % (imagename,))
+            imagename = f"rbd-{str(imageid)}"
+            log.info(f"Creating imagename {imagename}")
             remote.run(
                 args = [
                     "rbd",
@@ -62,11 +62,12 @@ def task(ctx, config):
                         "--io-threads", str(write_threads),
                         "--io-total", str(write_total_per_snap),
                         "--io-pattern", "rand"])
-            log.info("imagename %s first bench" % (imagename,))
+
+            log.info(f"imagename {imagename} first bench")
             bench_run()
             for snapid in range(num_snaps):
-                snapname = "snap-%s" % (str(snapid),)
-                log.info("imagename %s creating snap %s" % (imagename, snapname))
+                snapname = f"snap-{str(snapid)}"
+                log.info(f"imagename {imagename} creating snap {snapname}")
                 remote.run(
                     args = [
                         "rbd", "snap", "create",

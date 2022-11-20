@@ -14,7 +14,7 @@ def rados_start(ctx, remote, cmd):
     """
     Run a remote rados command (currently used to only write data)
     """
-    log.info("rados %s" % ' '.join(cmd))
+    log.info(f"rados {' '.join(cmd)}")
     testdir = teuthology.get_testdir(ctx)
     pre = [
         'adjust-ulimits',
@@ -23,11 +23,10 @@ def rados_start(ctx, remote, cmd):
         'rados',
         ];
     pre.extend(cmd)
-    proc = remote.run(
+    return remote.run(
         args=pre,
         wait=False,
-        )
-    return proc
+    )
 
 def task(ctx, config):
     """
@@ -41,7 +40,7 @@ def task(ctx, config):
     (mon,) = ctx.cluster.only(first_mon).remotes.keys()
 
     num_osds = teuthology.num_instances_of_type(ctx.cluster, 'osd')
-    log.info('num_osds is %s' % num_osds)
+    log.info(f'num_osds is {num_osds}')
     assert num_osds == 3
 
     manager = ceph_manager.CephManager(

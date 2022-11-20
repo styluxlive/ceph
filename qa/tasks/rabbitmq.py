@@ -110,9 +110,10 @@ def task(ctx,config):
     - rabbitmq:
         client.0:
     """
-    assert config is None or isinstance(config, list) \
-        or isinstance(config, dict), \
-        "task rabbitmq only supports a list or dictionary for configuration"
+    assert config is None or isinstance(
+        config, (list, dict)
+    ), "task rabbitmq only supports a list or dictionary for configuration"
+
 
     all_clients = ['client.{id}'.format(id=id_)
                    for id_ in teuthology.all_roles_of_type(ctx.cluster, 'client')]

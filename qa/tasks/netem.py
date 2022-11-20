@@ -66,18 +66,18 @@ def static_delay(remote, host, interface, delay):
         remote.run(args=set_priority(interface))
 
         # set static delay, with +/- 5ms jitter with normal distribution as default
-        log.info('Setting delay to %s' % delay)
-        set_delay.extend(['%s' % delay, '5ms', 'distribution', 'normal'])
+        log.info(f'Setting delay to {delay}')
+        set_delay.extend([f'{delay}', '5ms', 'distribution', 'normal'])
         remote.run(args=set_delay)
 
         # set delay to a particular remote node via ip
-        log.info('Delay set on %s' % remote)
-        set_ip.extend(['%s' % ip, 'flowid', '2:1'])
+        log.info(f'Delay set on {remote}')
+        set_ip.extend([f'{ip}', 'flowid', '2:1'])
         remote.run(args=set_ip)
     else:
         # if the device is already created, only change the delay
-        log.info('Setting delay to %s' % delay)
-        change_delay.extend(['%s' % delay, '5ms', 'distribution', 'normal'])
+        log.info(f'Setting delay to {delay}')
+        change_delay.extend([f'{delay}', '5ms', 'distribution', 'normal'])
         remote.run(args=change_delay)
 
 
@@ -101,17 +101,17 @@ def variable_delay(remote, host, interface, delay_range=[]):
 
         # set variable delay
         log.info('Setting varying delay')
-        set_delay.extend(['%s' % delay1, '%s' % delay2])
+        set_delay.extend([f'{delay1}', f'{delay2}'])
         remote.run(args=set_delay)
 
         # set delay to a particular remote node via ip
-        log.info('Delay set on %s' % remote)
-        set_ip.extend(['%s' % ip, 'flowid', '2:1'])
+        log.info(f'Delay set on {remote}')
+        set_ip.extend([f'{ip}', 'flowid', '2:1'])
         remote.run(args=set_ip)
     else:
         # if the device is already created, only change the delay
         log.info('Setting varying delay')
-        change_delay.extend(['%s' % delay1, '%s' % delay2])
+        change_delay.extend([f'{delay1}', f'{delay2}'])
         remote.run(args=change_delay)
 
 
@@ -147,8 +147,8 @@ class Toggle:
         if tc.strip().find('refcnt') == -1:
             self.remote.run(args=set_priority(self.interface))
             # packet drop to specific ip
-            log.info('Drop all packets to %s' % self.host)
-            set_ip.extend(['%s' % self.ip, 'action', 'drop'])
+            log.info(f'Drop all packets to {self.host}')
+            set_ip.extend([f'{self.ip}', 'action', 'drop'])
             self.remote.run(args=set_ip)
 
     def link_toggle(self):
@@ -181,7 +181,7 @@ class Toggle:
 
     def end(self, gname):
         self.stop_event.set()
-        log.info('gname is {}'.format(self.ctx.netem.names[gname]))
+        log.info(f'gname is {self.ctx.netem.names[gname]}')
         self.ctx.netem.names[gname].get()
 
     def cleanup(self):
@@ -224,7 +224,7 @@ def task(ctx, config):
 
     """
 
-    log.info('config %s' % config)
+    log.info(f'config {config}')
 
     assert isinstance(config, dict), \
         "please list clients to run on"
@@ -244,7 +244,7 @@ def task(ctx, config):
         if config.get('delay_range', False):
             variable_delay(remote, host, config.get('iface'), config.get('delay_range'))
         if config.get('link_toggle_interval', False):
-            log.info('Toggling link for %s' % config.get('link_toggle_interval'))
+            log.info(f"Toggling link for {config.get('link_toggle_interval')}")
             global toggle
             toggle = Toggle(ctx, remote, host, config.get('iface'), config.get('link_toggle_interval'))
             toggle.begin(config.get('gname'))

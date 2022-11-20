@@ -63,8 +63,11 @@ def _config_user(bntests_conf, section, user):
     bntests_conf[section].setdefault('user_id', user)
     bntests_conf[section].setdefault('email', '{user}+test@test.test'.format(user=user))
     bntests_conf[section].setdefault('display_name', 'Mr. {user}'.format(user=user))
-    bntests_conf[section].setdefault('access_key',
-        ''.join(random.choice(string.ascii_uppercase) for i in range(20)))
+    bntests_conf[section].setdefault(
+        'access_key',
+        ''.join(random.choice(string.ascii_uppercase) for _ in range(20)),
+    )
+
     bntests_conf[section].setdefault('secret_key',
         base64.b64encode(os.urandom(40)).decode())
 
@@ -130,7 +133,7 @@ def create_users(ctx, config):
             _config_user(bntests_conf, section, '{user}.{client}'.format(user=user, client=client))
             log.debug('Creating user {user} on {host}'.format(user=bntests_conf[section]['user_id'], host=client))
             cluster_name, daemon_type, client_id = teuthology.split_role(client)
-            client_with_id = daemon_type + '.' + client_id
+            client_with_id = f'{daemon_type}.{client_id}'
             ctx.cluster.only(client).run(
                 args=[
                     'adjust-ulimits',
@@ -154,7 +157,7 @@ def create_users(ctx, config):
             for user in users.values():
                 uid = '{user}.{client}'.format(user=user, client=client)
                 cluster_name, daemon_type, client_id = teuthology.split_role(client)
-                client_with_id = daemon_type + '.' + client_id
+                client_with_id = f'{daemon_type}.{client_id}'
                 ctx.cluster.only(client).run(
                     args=[
                         'adjust-ulimits',
@@ -271,9 +274,10 @@ def task(ctx,config):
     teuthology-suite --ceph-repo https://github.com/ceph/ceph-ci.git -s rgw:notifications --ceph your_ceph_branch_name -m smithi --suite-repo https://github.com/your_name/ceph.git --suite-branch your_branch_name
     
     """
-    assert config is None or isinstance(config, list) \
-        or isinstance(config, dict), \
-        "task kafka only supports a list or dictionary for configuration"
+    assert config is None or isinstance(
+        config, (list, dict)
+    ), "task kafka only supports a list or dictionary for configuration"
+
 
     all_clients = ['client.{id}'.format(id=id_)
                    for id_ in teuthology.all_roles_of_type(ctx.cluster, 'client')]
@@ -289,7 +293,7 @@ def task(ctx,config):
 
     for client in clients:
         endpoint = ctx.rgw.role_endpoints.get(client)
-        assert endpoint, 'bntests: no rgw endpoint for {}'.format(client)
+        assert endpoint, f'bntests: no rgw endpoint for {client}'
 
         bntests_conf[client] = ConfigObj(
             indent_type='',

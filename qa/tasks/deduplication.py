@@ -82,7 +82,7 @@ def task(ctx, config):
 
     def run_remote(args, need_wait, client_num):
         clients = ['client.{id}'.format(id=id_) for id_ in teuthology.all_roles_of_type(ctx.cluster, 'client')]
-        log.info('clients are %s' % clients)
+        log.info(f'clients are {clients}')
         role = 'client.{id}'.format(id=client_num)
         if role not in clients:
             raise Exception('wrong client {c}'.format(c=role))
@@ -114,11 +114,11 @@ def task(ctx, config):
             time.sleep(30)
 
     def get_chunk_objs(chunk_pool):
-        chunk_obj_list = run_remote(('rados ls -p ' + chunk_pool).split(), True, 1).split()
-        if chunk_obj_list == False:
-            return None
-        else:
-            return chunk_obj_list
+        chunk_obj_list = run_remote(
+            f'rados ls -p {chunk_pool}'.split(), True, 1
+        ).split()
+
+        return None if chunk_obj_list == False else chunk_obj_list
 
     def get_ref_list(chunk_pool, chunk_obj):
         # get reference list of chunk object
@@ -146,11 +146,13 @@ def task(ctx, config):
         max_validation_cnt = 15
         retry_cnt = 0
         # chunk objs for re-validation after chunk-repair
-        retry_chunk_objs = list() 
+        retry_chunk_objs = [] 
 
         # check whether sample-dedup has been started
         chunk_obj_list = get_chunk_objs(chunk_pool)
-        while (chunk_obj_list == None or len(chunk_obj_list) == 0) and retry_cnt < max_validation_cnt:
+        while (
+            chunk_obj_list is None or len(chunk_obj_list) == 0
+        ) and retry_cnt < max_validation_cnt:
             # retry getting # chunk objs after 30 secs of sleep
             time.sleep(30)
             chunk_obj_list = get_chunk_objs(chunk_pool)
@@ -167,15 +169,12 @@ def task(ctx, config):
             for chunk_obj in chunk_obj_list:
                 ref_list = get_ref_list(chunk_pool, chunk_obj)
                 for ref in ref_list:
-                    ret = run_remote(
-                        ('rados -p ' + base_pool + ' stat ' + ref['oid'])
-                        .split(), True, 1
-                    )
+                    ret = run_remote((f'rados -p {base_pool} stat ' + ref['oid']).split(), True, 1)
                     # check if ref exists in base pool
                     if ret == False or len(ret) == 0:
                         # if ref not exists in base pool, try repair in order to avoid 
                         # false-positive inconsistent reference
-                        ret = run_remote(('ceph osd pool stats ' + base_pool).split(), True, 1)
+                        ret = run_remote(f'ceph osd pool stats {base_pool}'.split(), True, 1)
                         assert len(ret) > 0
                         base_pool_id = ret.split()[3]
                         ret = run_remote(
@@ -191,22 +190,20 @@ def task(ctx, config):
             for chunk_obj in retry_chunk_objs:
                 ref_list = get_ref_list(chunk_pool, chunk_obj)
                 for ref in ref_list:
-                    ret = run_remote(
-                        ('rados -p ' + base_pool + ' stat ' + ref['oid'])
-                        .split(), True, 1
-                    )
+                    ret = run_remote((f'rados -p {base_pool} stat ' + ref['oid']).split(), True, 1)
                     assert len(ret) > 0
                     log.info(
                         '{0} obj exists in {1} after repair'.format(ref['oid'], 
                         base_pool)
                     )
-            retry_chunk_objs = list()
+            retry_chunk_objs = []
 
             # get chunk objects for the next loop
             chunk_obj_list = get_chunk_objs(chunk_pool)
             retry_cnt += 1
             time.sleep(30)
         return True
+
 
 
     running = gevent.spawn(thread)
