@@ -34,17 +34,23 @@ class CephReleases(Directive):
                 releases = yaml.safe_load(fp)
                 releases = releases["releases"]
         except Exception as e:
-            return [document.reporter.warning(
-                "Failed to open Ceph releases file {}: {}".format(filename, e),
-                line=self.lineno)]
+            return [
+                document.reporter.warning(
+                    f"Failed to open Ceph releases file {filename}: {e}",
+                    line=self.lineno,
+                )
+            ]
+
 
         table = nodes.table()
         tgroup = nodes.tgroup(cols=3)
         table += tgroup
 
         tgroup.extend(
-            nodes.colspec(colwidth=30, colname='c'+str(idx))
-            for idx, _ in enumerate(range(4)))
+            nodes.colspec(colwidth=30, colname=f'c{str(idx)}')
+            for idx, _ in enumerate(range(4))
+        )
+
 
         thead = nodes.thead()
         tgroup += thead
@@ -68,9 +74,8 @@ class CephReleases(Directive):
             if current:
                 if actual_eol and actual_eol <= datetime.datetime.now().date():
                     continue
-            else:
-                if not actual_eol:
-                    continue
+            elif not actual_eol:
+                continue
 
             trow = nodes.row()
 
@@ -87,18 +92,15 @@ class CephReleases(Directive):
             newest_release = sorted_releases[-1]
 
             entry = nodes.entry()
-            para = nodes.paragraph(text="{}".format(
-                oldest_release["released"]))
+            para = nodes.paragraph(text=f'{oldest_release["released"]}')
             entry += para
             trow += entry
 
             entry = nodes.entry()
             if newest_release.get("skip_ref", False):
-                para = nodes.paragraph(text="{}".format(
-                    newest_release["version"]))
+                para = nodes.paragraph(text=f'{newest_release["version"]}')
             else:
-                para = nodes.paragraph(text="`{}`_".format(
-                    newest_release["version"]))
+                para = nodes.paragraph(text=f'`{newest_release["version"]}`_')
             sphinx.util.nodes.nested_parse_with_titles(
                     self.state, para, entry)
             #entry += para
@@ -205,9 +207,13 @@ class CephTimeline(Directive):
             with open(filename, 'r') as fp:
                 releases = yaml.safe_load(fp)
         except Exception as e:
-            return [document.reporter.warning(
-                "Failed to open Ceph releases file {}: {}".format(filename, e),
-                line=self.lineno)]
+            return [
+                document.reporter.warning(
+                    f"Failed to open Ceph releases file {filename}: {e}",
+                    line=self.lineno,
+                )
+            ]
+
 
         display_releases = self.arguments[1:]
 
@@ -234,8 +240,10 @@ class CephTimeline(Directive):
 
         columns = ["Date"] + display_releases
         tgroup.extend(
-            nodes.colspec(colwidth=30, colname='c'+str(idx))
-            for idx, _ in enumerate(range(len(columns))))
+            nodes.colspec(colwidth=30, colname=f'c{str(idx)}')
+            for idx, _ in enumerate(range(len(columns)))
+        )
+
 
         thead = nodes.thead()
         tgroup += thead
@@ -269,7 +277,7 @@ class CephTimeline(Directive):
                     if row_info[3]: # if skip ref
                         para = nodes.paragraph(text=row_info[2])
                     else:
-                        para = nodes.paragraph(text="`{}`_".format(row_info[2]))
+                        para = nodes.paragraph(text=f"`{row_info[2]}`_")
                     sphinx.util.nodes.nested_parse_with_titles(
                             self.state, para, entry)
                 else:

@@ -26,14 +26,14 @@ def task(ctx, config):
         )
 
     mons = [f.split('.')[1] for f in teuthology.get_mon_names(ctx)]
-    log.info("mon ids = %s" % mons)
+    log.info(f"mon ids = {mons}")
 
     manager.wait_for_mon_quorum_size(len(mons))
 
     log.info('verifying all monitors are in the quorum')
     for m in mons:
         s = manager.get_mon_status(m)
-        assert s['state'] == 'leader' or s['state'] == 'peon'
+        assert s['state'] in ['leader', 'peon']
         assert len(s['quorum']) == len(mons)
 
     log.info('restarting each monitor in turn')
@@ -54,19 +54,17 @@ def task(ctx, config):
         for m in mons:
             manager.kill_mon(m)
 
-        log.info('forming a minimal quorum for %s, then adding monitors' % mons)
+        log.info(f'forming a minimal quorum for {mons}, then adding monitors')
         qnum = (len(mons) // 2) + 1
-        num = 0
-        for m in mons:
+        for num, m in enumerate(mons, start=1):
             manager.revive_mon(m)
-            num += 1
             if num >= qnum:
                 manager.wait_for_mon_quorum_size(num)
 
     # on both leader and non-leader ranks...
     for rank in [0, 1]:
         # take one out
-        log.info('removing mon %s' % mons[rank])
+        log.info(f'removing mon {mons[rank]}')
         manager.kill_mon(mons[rank])
         manager.wait_for_mon_quorum_size(len(mons) - 1)
 
@@ -75,6 +73,6 @@ def task(ctx, config):
         for n in range(1, m):
             manager.raw_cluster_cmd('log', '%d of %d' % (n, m))
 
-        log.info('adding mon %s back in' % mons[rank])
+        log.info(f'adding mon {mons[rank]} back in')
         manager.revive_mon(mons[rank])
         manager.wait_for_mon_quorum_size(len(mons))

@@ -215,8 +215,8 @@ def generate_iso(ctx, config):
         remote.run(args=refspec.clone(git_url, clone_dir))
 
         src_dir = os.path.dirname(__file__)
-        userdata_path = os.path.join(testdir, 'qemu', 'userdata.' + client)
-        metadata_path = os.path.join(testdir, 'qemu', 'metadata.' + client)
+        userdata_path = os.path.join(testdir, 'qemu', f'userdata.{client}')
+        metadata_path = os.path.join(testdir, 'qemu', f'metadata.{client}')
 
         with open(os.path.join(src_dir, 'userdata_setup.yaml')) as f:
             test_setup = ''.join(f.readlines())
@@ -258,10 +258,11 @@ def generate_iso(ctx, config):
   cp /mnt/cdrom/ceph.* /etc/ceph/
 """
 
-        cloud_config_archive = client_config.get('cloud_config_archive', [])
-        if cloud_config_archive:
-          user_data += yaml.safe_dump(cloud_config_archive, default_style='|',
-                                      default_flow_style=False)
+        if cloud_config_archive := client_config.get(
+            'cloud_config_archive', []
+        ):
+            user_data += yaml.safe_dump(cloud_config_archive, default_style='|',
+                                        default_flow_style=False)
 
         # this may change later to pass the directories as args to the
         # script or something. xfstests needs that.
@@ -310,14 +311,21 @@ def generate_iso(ctx, config):
             (remote,) = ctx.cluster.only(client).remotes.keys()
             remote.run(
                 args=[
-                    'rm', '-rf',
-                    '{tdir}/qemu/{client}.iso'.format(tdir=testdir, client=client),
-                    os.path.join(testdir, 'qemu', 'userdata.' + client),
-                    os.path.join(testdir, 'qemu', 'metadata.' + client),
-                    '{tdir}/qemu/{client}.test.sh'.format(tdir=testdir, client=client),
-                    '{tdir}/qemu_clone.{client}'.format(tdir=testdir, client=client),
-                    ],
-                )
+                    'rm',
+                    '-rf',
+                    '{tdir}/qemu/{client}.iso'.format(
+                        tdir=testdir, client=client
+                    ),
+                    os.path.join(testdir, 'qemu', f'userdata.{client}'),
+                    os.path.join(testdir, 'qemu', f'metadata.{client}'),
+                    '{tdir}/qemu/{client}.test.sh'.format(
+                        tdir=testdir, client=client
+                    ),
+                    '{tdir}/qemu_clone.{client}'.format(
+                        tdir=testdir, client=client
+                    ),
+                ]
+            )
 
 @contextlib.contextmanager
 def download_image(ctx, config):

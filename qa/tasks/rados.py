@@ -209,7 +209,7 @@ def task(ctx, config):
 
     if config.get('write_append_excl', True):
         if 'write' in weights:
-            weights['write'] = weights['write'] // 2
+            weights['write'] //= 2
             weights['write_excl'] = weights['write']
 
         if 'append' in weights:
@@ -220,12 +220,12 @@ def task(ctx, config):
         args.extend([
             '--op', op, str(weight)
         ])
-                
+
 
     def thread():
         """Thread spawned by gevent"""
         clients = ['client.{id}'.format(id=id_) for id_ in teuthology.all_roles_of_type(ctx.cluster, 'client')]
-        log.info('clients are %s' % clients)
+        log.info(f'clients are {clients}')
         manager = ctx.managers['ceph']
         if config.get('ec_pool', False):
             profile = config.get('erasure_code_profile', {})

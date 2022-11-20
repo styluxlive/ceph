@@ -19,9 +19,10 @@ def task(ctx, config):
     :param ctx: Context
     :param config: Configuration
     """
-    assert config is None or isinstance(config, list) \
-        or isinstance(config, dict), \
-        "task only supports a list or dictionary for configuration"
+    assert config is None or isinstance(
+        config, (list, dict)
+    ), "task only supports a list or dictionary for configuration"
+
     all_clients = ['client.{id}'.format(id=id_)
                    for id_ in teuthology.all_roles_of_type(ctx.cluster, 'client')]
     if config is None:
@@ -36,7 +37,7 @@ def task(ctx, config):
 
     testdir = teuthology.get_testdir(ctx)
 
-    dir = '%s/ceph.data/test.%s' % (testdir, client)
+    dir = f'{testdir}/ceph.data/test.{client}'
 
     seed = int(random.uniform(1,100))
     start = 800 + random.randint(800,1200)

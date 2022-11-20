@@ -37,9 +37,7 @@ log = logging.getLogger(__name__)
 
 # this is for cephadm clusters
 def shell(ctx, cluster_name, remote, args, name=None, **kwargs):
-    extra_args = []
-    if name:
-        extra_args = ['-n', name]
+    extra_args = ['-n', name] if name else []
     return remote.run(
         args=[
             'sudo',
@@ -239,7 +237,7 @@ class OSDThrasher(Thrasher):
         self.max_pgs = self.config.get("max_pgs_per_pool_osd", 1200) * len(num_osds)
         self.min_pgs = self.config.get("min_pgs_per_pool_osd", 1) * len(num_osds)
         if self.config is None:
-            self.config = dict()
+            self.config = {}
         # prevent monitor from auto-marking things out while thrasher runs
         # try both old and new tell syntax, in case we are testing old code
         self.saved_options = []
@@ -268,7 +266,7 @@ class OSDThrasher(Thrasher):
                          "not available on all OSD nodes")
         else:
             self.ceph_objectstore_tool = \
-                self.config.get('ceph_objectstore_tool', True)
+                    self.config.get('ceph_objectstore_tool', True)
         # spawn do_thrash
         self.thread = gevent.spawn(self.do_thrash)
         if self.sighup_delay:
@@ -341,8 +339,7 @@ class OSDThrasher(Thrasher):
         """
         if osd is None:
             osd = random.choice(self.live_osds)
-        self.log("Killing osd %s, live_osds are %s" % (str(osd),
-                                                       str(self.live_osds)))
+        self.log(f"Killing osd {str(osd)}, live_osds are {str(self.live_osds)}")
         self.live_osds.remove(osd)
         self.dead_osds.append(osd)
         self.ceph_manager.kill_osd(osd)
@@ -351,19 +348,19 @@ class OSDThrasher(Thrasher):
         if mark_out and osd in self.in_osds:
             self.out_osd(osd)
         if self.ceph_objectstore_tool:
-            self.log("Testing ceph-objectstore-tool on down osd.%s" % osd)
+            self.log(f"Testing ceph-objectstore-tool on down osd.{osd}")
             remote = self.ceph_manager.find_remote('osd', osd)
             FSPATH = self.ceph_manager.get_filepath()
             JPATH = os.path.join(FSPATH, "journal")
             exp_osd = imp_osd = osd
-            self.log('remote for osd %s is %s' % (osd, remote))
+            self.log(f'remote for osd {osd} is {remote}')
             exp_remote = imp_remote = remote
             # If an older osd is available we'll move a pg from there
             if (len(self.dead_osds) > 1 and
                     random.random() < self.chance_move_pg):
                 exp_osd = random.choice(self.dead_osds[:-1])
                 exp_remote = self.ceph_manager.find_remote('osd', exp_osd)
-                self.log('remote for exp osd %s is %s' % (exp_osd, exp_remote))
+                self.log(f'remote for exp osd {exp_osd} is {exp_remote}')
             prefix = [
                 '--no-mon-config',
                 '--log-file=/var/log/ceph/objectstore_tool.$pid.log',
@@ -389,12 +386,19 @@ class OSDThrasher(Thrasher):
             with safe_while(sleep=15, tries=40, action="ceph-objectstore-tool --op list-pgs") as proceed:
                 while proceed():
                     proc = self.run_ceph_objectstore_tool(
-                        exp_remote, 'osd.%s' % exp_osd,
-                        prefix + [
-                            '--data-path', FSPATH.format(id=exp_osd),
-                            '--journal-path', JPATH.format(id=exp_osd),
-                            '--op', 'list-pgs',
-                        ])
+                        exp_remote,
+                        f'osd.{exp_osd}',
+                        prefix
+                        + [
+                            '--data-path',
+                            FSPATH.format(id=exp_osd),
+                            '--journal-path',
+                            JPATH.format(id=exp_osd),
+                            '--op',
+                            'list-pgs',
+                        ],
+                    )
+
                     if proc.exitstatus == 0:
                         break
                     elif (proc.exitstatus == 1 and
@@ -429,28 +433,45 @@ class OSDThrasher(Thrasher):
             # export
             # Can't use new export-remove op since this is part of upgrade testing
             proc = self.run_ceph_objectstore_tool(
-                exp_remote, 'osd.%s' % exp_osd,
-                prefix + [
-                    '--data-path', FSPATH.format(id=exp_osd),
-                    '--journal-path', JPATH.format(id=exp_osd),
-                    '--op', 'export',
-                    '--pgid', pg,
-                    '--file', exp_path,
-                ])
+                exp_remote,
+                f'osd.{exp_osd}',
+                prefix
+                + [
+                    '--data-path',
+                    FSPATH.format(id=exp_osd),
+                    '--journal-path',
+                    JPATH.format(id=exp_osd),
+                    '--op',
+                    'export',
+                    '--pgid',
+                    pg,
+                    '--file',
+                    exp_path,
+                ],
+            )
+
             if proc.exitstatus:
                 raise Exception("ceph-objectstore-tool: "
                                 "export failure with status {ret}".
                                 format(ret=proc.exitstatus))
             # remove
             proc = self.run_ceph_objectstore_tool(
-                exp_remote, 'osd.%s' % exp_osd,
-                prefix + [
-                    '--data-path', FSPATH.format(id=exp_osd),
-                    '--journal-path', JPATH.format(id=exp_osd),
+                exp_remote,
+                f'osd.{exp_osd}',
+                prefix
+                + [
+                    '--data-path',
+                    FSPATH.format(id=exp_osd),
+                    '--journal-path',
+                    JPATH.format(id=exp_osd),
                     '--force',
-                    '--op', 'remove',
-                    '--pgid', pg,
-                ])
+                    '--op',
+                    'remove',
+                    '--pgid',
+                    pg,
+                ],
+            )
+
             if proc.exitstatus:
                 raise Exception("ceph-objectstore-tool: "
                                 "remove failure with status {ret}".
@@ -460,12 +481,18 @@ class OSDThrasher(Thrasher):
                 # If pg isn't already on this osd, then we will move it there
                 proc = self.run_ceph_objectstore_tool(
                     imp_remote,
-                    'osd.%s' % imp_osd,
-                    prefix + [
-                        '--data-path', FSPATH.format(id=imp_osd),
-                        '--journal-path', JPATH.format(id=imp_osd),
-                        '--op', 'list-pgs',
-                    ])
+                    f'osd.{imp_osd}',
+                    prefix
+                    + [
+                        '--data-path',
+                        FSPATH.format(id=imp_osd),
+                        '--journal-path',
+                        JPATH.format(id=imp_osd),
+                        '--op',
+                        'list-pgs',
+                    ],
+                )
+
                 if proc.exitstatus:
                     raise Exception("ceph-objectstore-tool: "
                                     "imp list-pgs failure with status {ret}".
@@ -500,14 +527,21 @@ class OSDThrasher(Thrasher):
                     imp_remote = exp_remote
             # import
             proc = self.run_ceph_objectstore_tool(
-                imp_remote, 'osd.%s' % imp_osd,
+                imp_remote,
+                f'osd.{imp_osd}',
                 [
-                    '--data-path', FSPATH.format(id=imp_osd),
-                    '--journal-path', JPATH.format(id=imp_osd),
+                    '--data-path',
+                    FSPATH.format(id=imp_osd),
+                    '--journal-path',
+                    JPATH.format(id=imp_osd),
                     '--log-file=/var/log/ceph/objectstore_tool.$pid.log',
-                    '--op', 'import',
-                    '--file', exp_path,
-                ])
+                    '--op',
+                    'import',
+                    '--file',
+                    exp_path,
+                ],
+            )
+
             if proc.exitstatus == 1:
                 bogosity = "The OSD you are using is older than the exported PG"
                 if bogosity in proc.stderr.getvalue():
@@ -562,8 +596,10 @@ class OSDThrasher(Thrasher):
         """
         if osd is None:
             osd = random.choice(self.live_osds)
-        self.log("Blackholing and then killing osd %s, live_osds are %s" %
-                 (str(osd), str(self.live_osds)))
+        self.log(
+            f"Blackholing and then killing osd {str(osd)}, live_osds are {str(self.live_osds)}"
+        )
+
         self.live_osds.remove(osd)
         self.dead_osds.append(osd)
         self.ceph_manager.blackhole_kill_osd(osd)
@@ -575,7 +611,7 @@ class OSDThrasher(Thrasher):
         """
         if osd is None:
             osd = random.choice(self.dead_osds)
-        self.log("Reviving osd %s" % (str(osd),))
+        self.log(f"Reviving osd {str(osd)}")
         self.ceph_manager.revive_osd(
             osd,
             self.revive_timeout,
@@ -596,8 +632,7 @@ class OSDThrasher(Thrasher):
         """
         if osd is None:
             osd = random.choice(self.in_osds)
-        self.log("Removing osd %s, in_osds are: %s" %
-                 (str(osd), str(self.in_osds)))
+        self.log(f"Removing osd {str(osd)}, in_osds are: {str(self.in_osds)}")
         self.ceph_manager.mark_out_osd(osd)
         self.in_osds.remove(osd)
         self.out_osds.append(osd)
@@ -611,11 +646,11 @@ class OSDThrasher(Thrasher):
             osd = random.choice(self.out_osds)
         if osd in self.dead_osds:
             return self.revive_osd(osd)
-        self.log("Adding osd %s" % (str(osd),))
+        self.log(f"Adding osd {str(osd)}")
         self.out_osds.remove(osd)
         self.in_osds.append(osd)
         self.ceph_manager.mark_in_osd(osd)
-        self.log("Added osd %s" % (str(osd),))
+        self.log(f"Added osd {str(osd)}")
 
     def reweight_osd_or_by_util(self, osd=None):
         """
@@ -626,12 +661,12 @@ class OSDThrasher(Thrasher):
             if osd is None:
                 osd = random.choice(self.in_osds)
             val = random.uniform(.1, 1.0)
-            self.log("Reweighting osd %s to %s" % (str(osd), str(val)))
+            self.log(f"Reweighting osd {str(osd)} to {val}")
             self.ceph_manager.raw_cluster_cmd('osd', 'reweight',
                                               str(osd), str(val))
         else:
             # do it several times, the option space is large
-            for i in range(5):
+            for _ in range(5):
                 options = {
                     'max_change': random.choice(['0.05', '1.0', '3.0']),
                     'overage': random.choice(['110', '1000']),
@@ -639,7 +674,7 @@ class OSDThrasher(Thrasher):
                         'reweight-by-utilization',
                         'test-reweight-by-utilization']),
                 }
-                self.log("Reweighting by: %s"%(str(options),))
+                self.log(f"Reweighting by: {options}")
                 self.ceph_manager.raw_cluster_cmd(
                     'osd',
                     options['type'],
@@ -678,7 +713,7 @@ class OSDThrasher(Thrasher):
         from random import shuffle
         out = self.ceph_manager.raw_cluster_cmd('osd', 'dump', '-f', 'json-pretty')
         j = json.loads(out)
-        self.log('j is %s' % j)
+        self.log(f'j is {j}')
         try:
             if random.random() >= .3:
                 pgs = self.ceph_manager.get_pg_stats()
@@ -689,23 +724,23 @@ class OSDThrasher(Thrasher):
                 pgid = str(pg['pgid'])
                 poolid = int(pgid.split('.')[0])
                 sizes = [x['size'] for x in j['pools'] if x['pool'] == poolid]
-                if len(sizes) == 0:
+                if not sizes:
                     self.log('No pools; doing nothing')
                     return
                 n = sizes[0]
                 osds = self.in_osds + self.out_osds
                 shuffle(osds)
-                osds = osds[0:n]
-                self.log('Setting %s to %s' % (pgid, osds))
+                osds = osds[:n]
+                self.log(f'Setting {pgid} to {osds}')
                 cmd = ['osd', 'pg-upmap', pgid] + [str(x) for x in osds]
-                self.log('cmd %s' % cmd)
+                self.log(f'cmd {cmd}')
                 self.ceph_manager.raw_cluster_cmd(*cmd)
             else:
                 m = j['pg_upmap']
                 if len(m) > 0:
                     shuffle(m)
                     pg = m[0]['pgid']
-                    self.log('Clearing pg_upmap on %s' % pg)
+                    self.log(f'Clearing pg_upmap on {pg}')
                     self.ceph_manager.raw_cluster_cmd(
                         'osd',
                         'rm-pg-upmap',
@@ -723,7 +758,7 @@ class OSDThrasher(Thrasher):
         from random import shuffle
         out = self.ceph_manager.raw_cluster_cmd('osd', 'dump', '-f', 'json-pretty')
         j = json.loads(out)
-        self.log('j is %s' % j)
+        self.log(f'j is {j}')
         try:
             if random.random() >= .3:
                 pgs = self.ceph_manager.get_pg_stats()
@@ -734,23 +769,23 @@ class OSDThrasher(Thrasher):
                 pgid = str(pg['pgid'])
                 poolid = int(pgid.split('.')[0])
                 sizes = [x['size'] for x in j['pools'] if x['pool'] == poolid]
-                if len(sizes) == 0:
+                if not sizes:
                     self.log('No pools; doing nothing')
                     return
                 n = sizes[0]
                 osds = self.in_osds + self.out_osds
                 shuffle(osds)
-                osds = osds[0:n*2]
-                self.log('Setting %s to %s' % (pgid, osds))
+                osds = osds[:n*2]
+                self.log(f'Setting {pgid} to {osds}')
                 cmd = ['osd', 'pg-upmap-items', pgid] + [str(x) for x in osds]
-                self.log('cmd %s' % cmd)
+                self.log(f'cmd {cmd}')
                 self.ceph_manager.raw_cluster_cmd(*cmd)
             else:
                 m = j['pg_upmap_items']
                 if len(m) > 0:
                     shuffle(m)
                     pg = m[0]['pgid']
-                    self.log('Clearing pg_upmap on %s' % pg)
+                    self.log(f'Clearing pg_upmap on {pg}')
                     self.ceph_manager.raw_cluster_cmd(
                         'osd',
                         'rm-pg-upmap-items',
@@ -765,8 +800,7 @@ class OSDThrasher(Thrasher):
         Force recovery on some of PGs
         """
         backfill = random.random() >= 0.5
-        j = self.ceph_manager.get_pgids_to_force(backfill)
-        if j:
+        if j := self.ceph_manager.get_pgids_to_force(backfill):
             try:
                 if backfill:
                     self.ceph_manager.raw_cluster_cmd('pg', 'force-backfill', *j)
@@ -781,8 +815,7 @@ class OSDThrasher(Thrasher):
         Force recovery on some of PGs
         """
         backfill = random.random() >= 0.5
-        j = self.ceph_manager.get_pgids_to_cancel_force(backfill)
-        if j:
+        if j := self.ceph_manager.get_pgids_to_cancel_force(backfill):
             try:
                 if backfill:
                     self.ceph_manager.raw_cluster_cmd('pg', 'cancel-force-backfill', *j)
@@ -848,7 +881,7 @@ class OSDThrasher(Thrasher):
         pool = self.ceph_manager.get_pool()
         if pool is None:
             return
-        self.log("Growing pool %s" % (pool,))
+        self.log(f"Growing pool {pool}")
         if self.ceph_manager.expand_pool(pool,
                                          self.config.get('pool_grow_by', 10),
                                          self.max_pgs):
@@ -862,7 +895,7 @@ class OSDThrasher(Thrasher):
         if pool is None:
             return
         _ = self.ceph_manager.get_pool_pg_num(pool)
-        self.log("Shrinking pool %s" % (pool,))
+        self.log(f"Shrinking pool {pool}")
         if self.ceph_manager.contract_pool(
                 pool,
                 self.config.get('pool_shrink_by', 10),
@@ -880,7 +913,7 @@ class OSDThrasher(Thrasher):
             force = False
         else:
             force = True
-        self.log("fixing pg num pool %s" % (pool,))
+        self.log(f"fixing pg num pool {pool}")
         if self.ceph_manager.set_pool_pgpnum(pool, force):
             self.pools_to_fix_pgp_num.discard(pool)
 
@@ -901,7 +934,7 @@ class OSDThrasher(Thrasher):
         self.log("doing min_size thrashing")
         self.ceph_manager.wait_for_clean(timeout=180)
         assert self.ceph_manager.is_clean(), \
-            'not clean before minsize thrashing starts'
+                'not clean before minsize thrashing starts'
         while not self.stopping:
             # look up k and m from all the pools on each loop, in case it
             # changes as the cluster runs
@@ -948,7 +981,7 @@ class OSDThrasher(Thrasher):
                 self.log("No pools yet, waiting")
                 time.sleep(5)
                 continue
-                
+
             if minout > len(self.out_osds): # kill OSDs and mark out
                 self.log("forced to out an osd")
                 self.kill_osd(mark_out=True)
@@ -961,23 +994,24 @@ class OSDThrasher(Thrasher):
                 minup = max(minlive, k)
                 rand_val = random.uniform(0, 1)
                 self.log("choosing based on number of live OSDs and rand val {rand}".\
-                         format(rand=rand_val))
+                             format(rand=rand_val))
                 if len(self.live_osds) > minup+1 and rand_val < 0.5:
                     # chose to knock out as many OSDs as we can w/out downing PGs
-                    
+
                     most_killable = min(len(self.live_osds) - minup, m)
                     self.log("chose to kill {n} OSDs".format(n=most_killable))
-                    for i in range(1, most_killable):
+                    for _ in range(1, most_killable):
                         self.kill_osd(mark_out=True)
                     time.sleep(10)
                     # try a few times since there might be a concurrent pool
                     # creation or deletion
                     with safe_while(
-                            sleep=25, tries=5,
-                            action='check for active or peered') as proceed:
-                        while proceed():
-                            if self.ceph_manager.all_active_or_peered():
-                                break
+                                            sleep=25, tries=5,
+                                            action='check for active or peered') as proceed:
+                        while (
+                            proceed()
+                            and not self.ceph_manager.all_active_or_peered()
+                        ):
                             self.log('not all PGs are active or peered')
                 else: # chose to revive OSDs, bring up a random fraction of the dead ones
                     self.log("chose to revive osds")
@@ -986,10 +1020,10 @@ class OSDThrasher(Thrasher):
 
             # let PGs repair themselves or our next knockout might kill one
             self.ceph_manager.wait_for_clean(timeout=self.config.get('timeout'))
- 
+
         # / while not self.stopping
         self.all_up_in()
- 
+
         self.ceph_manager.wait_for_recovery(
             timeout=self.config.get('timeout')
             )
@@ -1018,7 +1052,7 @@ class OSDThrasher(Thrasher):
         assert the_one in status['down']
         time.sleep(duration - check_after + 20)
         status = self.ceph_manager.get_osd_status()
-        assert not the_one in status['down']
+        assert the_one not in status['down']
 
     def test_backfill_full(self):
         """

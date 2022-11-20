@@ -39,21 +39,25 @@ def task(ctx, config):
     def run_one(num):
         """Run test spawn from gevent"""
         start = time.time()
-        if not config.get('radosbench'):
-            benchcontext = {}
-        else:
-            benchcontext = copy.copy(config.get('radosbench'))
+        benchcontext = (
+            copy.copy(config.get('radosbench'))
+            if config.get('radosbench')
+            else {}
+        )
+
         iterations = 0
         while time.time() - start < int(config.get('time', 600)):
-            log.info("Starting iteration %s of segment %s"%(iterations, num))
-            benchcontext['pool'] = str(num) + "-" + str(iterations)
+            log.info(f"Starting iteration {iterations} of segment {num}")
+            benchcontext['pool'] = f"{str(num)}-{str(iterations)}"
             with radosbench.task(ctx, benchcontext):
                 time.sleep()
             iterations += 1
-    log.info("Starting %s threads"%(str(config.get('segments', 3)),))
+
+    log.info(f"Starting {str(config.get('segments', 3))} threads")
     segments = [
-        gevent.spawn(run_one, i)
-        for i in range(0, int(config.get('segments', 3)))]
+        gevent.spawn(run_one, i) for i in range(int(config.get('segments', 3)))
+    ]
+
 
     try:
         yield

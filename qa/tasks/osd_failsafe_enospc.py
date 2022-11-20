@@ -145,7 +145,10 @@ def task(ctx, config):
     lines = proc.stdout.getvalue().split('\n')
 
     count = len(filter(lambda line: '[WRN] OSD near full' in line, lines))
-    assert count == 1 or count == 2, 'Incorrect number of warning messages expected 1 or 2 got %d' % count
+    assert count in {1, 2}, (
+        'Incorrect number of warning messages expected 1 or 2 got %d' % count
+    )
+
     count = len(filter(lambda line: '[ERR] OSD full dropping all updates' in line, lines))
     assert count == 0, 'Incorrect number of error messages expected 0 got %d' % count
 

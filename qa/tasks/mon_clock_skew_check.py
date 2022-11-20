@@ -34,7 +34,7 @@ class ClockSkewCheck:
         self.config = config
 
         if self.config is None:
-            self.config = dict()
+            self.config = {}
 
 
 def task(ctx, config):
@@ -63,11 +63,10 @@ def task(ctx, config):
     time.sleep(interval)
 
     health = manager.get_mon_health(True)
-    log.info('got health %s' % health)
+    log.info(f'got health {health}')
     if expect_skew:
         if 'MON_CLOCK_SKEW' not in health['checks']:
             raise RuntimeError('expected MON_CLOCK_SKEW but got none')
-    else:
-        if 'MON_CLOCK_SKEW' in health['checks']:
-            raise RuntimeError('got MON_CLOCK_SKEW but expected none')
+    elif 'MON_CLOCK_SKEW' in health['checks']:
+        raise RuntimeError('got MON_CLOCK_SKEW but expected none')
 

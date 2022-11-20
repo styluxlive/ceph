@@ -27,7 +27,7 @@ def rgwadmin_rest(connection, cmd, params=None, headers=None, raw=False):
     """
     perform a rest command
     """
-    log.info('radosgw-admin-rest: %s %s' % (cmd, params))
+    log.info(f'radosgw-admin-rest: {cmd} {params}')
     put_cmds = ['create', 'link', 'add']
     post_cmds = ['unlink', 'modify']
     delete_cmds = ['trim', 'rm', 'process']
@@ -56,15 +56,9 @@ def rgwadmin_rest(connection, cmd, params=None, headers=None, raw=False):
         Get the name of the resource from information in cmd.
         """
         if cmd[0] == 'bucket' or cmd[0] in bucket_sub_resources:
-            if cmd[0] == 'bucket':
-                return 'bucket', ''
-            else:
-                return 'bucket', cmd[0]
+            return ('bucket', '') if cmd[0] == 'bucket' else ('bucket', cmd[0])
         elif cmd[0] == 'user' or cmd[0] in user_sub_resources:
-            if cmd[0] == 'user':
-                return 'user', ''
-            else:
-                return 'user', cmd[0]
+            return ('user', '') if cmd[0] == 'user' else ('user', cmd[0])
         elif cmd[0] == 'usage':
             return 'usage', ''
         elif cmd[0] == 'info':
@@ -72,13 +66,10 @@ def rgwadmin_rest(connection, cmd, params=None, headers=None, raw=False):
         elif cmd[0] == 'ratelimit':
             return 'ratelimit', ''
         elif cmd[0] == 'zone' or cmd[0] in zone_sub_resources:
-            if cmd[0] == 'zone':
-                return 'zone', ''
-            else:
-                return 'zone', cmd[0]
+            return ('zone', '') if cmd[0] == 'zone' else ('zone', cmd[0])
 
     def build_admin_request(conn, method, resource = '', headers=None, data='',
-            query_args=None, params=None):
+                query_args=None, params=None):
         """
         Build an administative request adapted from the build_request()
         method of boto.connection
@@ -88,10 +79,10 @@ def rgwadmin_rest(connection, cmd, params=None, headers=None, raw=False):
         auth_path = conn.calling_format.build_auth_path('admin', resource)
         host = conn.calling_format.build_host(conn.server_name(), 'admin')
         if query_args:
-            path += '?' + query_args
-            boto.log.debug('path=%s' % path)
-            auth_path += '?' + query_args
-            boto.log.debug('auth_path=%s' % auth_path)
+            path += f'?{query_args}'
+            boto.log.debug(f'path={path}')
+            auth_path += f'?{query_args}'
+            boto.log.debug(f'auth_path={auth_path}')
         return AWSAuthConnection.build_base_http_request(conn, method, path,
                 auth_path, params, headers, data, host)
 
@@ -107,14 +98,14 @@ def rgwadmin_rest(connection, cmd, params=None, headers=None, raw=False):
     result = handler(url, params=params, headers=request.headers)
 
     if raw:
-        log.info(' text result: %s' % result.text)
+        log.info(f' text result: {result.text}')
         return result.status_code, result.text
     elif len(result.content) == 0:
         # many admin requests return no body, so json() throws a JSONDecodeError
         log.info(' empty result')
         return result.status_code, None
     else:
-        log.info(' json result: %s' % result.json())
+        log.info(f' json result: {result.json()}')
         return result.status_code, result.json()
 
 
